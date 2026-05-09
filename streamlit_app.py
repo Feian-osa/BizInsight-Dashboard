@@ -4,9 +4,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
+
 import plotly.graph_objects as go   # ✅ ADD THIS
-import matplotlib.pyplot as plt
+
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
