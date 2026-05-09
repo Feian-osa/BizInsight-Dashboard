@@ -4,6 +4,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go   # ✅ ADD THIS
 import matplotlib.pyplot as plt
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
@@ -167,38 +169,67 @@ with tab2:
 # ===================== TAB 3: INVENTORY (EOQ) =====================
 with tab3:
     st.subheader("Inventory Optimization (EOQ Model)")
-    
     eoq = compute_eoq(annual_demand, ordering_cost, holding_cost)
+    
     if eoq != float('inf'):
         st.metric("Economic Order Quantity (EOQ)", f"{eoq:.0f} units")
         n_orders = annual_demand / eoq if eoq > 0 else 0
-        st.caption(f"📦 Orders per year: {n_orders:.1f} | ⏱️ Order cycle: {365/n_orders:.1f} days")
+        st.caption(f"📦 Orders per year: {n_orders:.1f} | ⏱️ Order cycle: {365 / n_orders:.1f} days" if n_orders > 0 else "")
     else:
         st.warning("Holding cost is zero – EOQ undefined (infinite).")
     
-    # EOQ Cost Curves
+    # EOQ Cost Curves – THIS MUST BE INSIDE the tab
     st.subheader("📉 EOQ Cost Trade‑off Analysis")
+    
     if eoq != float('inf') and eoq > 0:
-        Q_range = np.linspace(max(1, eoq*0.1), eoq*3, 100)
+        # Generate data
+        Q_range = np.linspace(max(1, eoq * 0.1), eoq * 3, 100)
         ordering_costs = (annual_demand / Q_range) * ordering_cost
         holding_costs = (Q_range / 2) * holding_cost
         total_costs = ordering_costs + holding_costs
         
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(Q_range, ordering_costs, label="Ordering Cost", linestyle="--")
-        ax.plot(Q_range, holding_costs, label="Holding Cost", linestyle="--")
-        ax.plot(Q_range, total_costs, label="Total Cost", linewidth=2)
-        ax.axvline(eoq, color='red', linestyle=':', label=f"EOQ = {eoq:.0f}")
-        ax.set_xlabel("Order Quantity (Q)")
-        ax.set_ylabel("Annual Cost (NPR.)")
-        ax.set_title("EOQ Cost Curves")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        st.pyplot(fig)
-        plt.close(fig)
+        # Create Plotly figure
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=Q_range, y=ordering_costs,
+            mode='lines', name='Ordering Cost',
+            line=dict(dash='dash', color='blue', width=2)
+        ))
+        fig.add_trace(go.Scatter(
+            x=Q_range, y=holding_costs,
+            mode='lines', name='Holding Cost',
+            line=dict(dash='dash', color='orange', width=2)
+        ))
+        fig.add_trace(go.Scatter(
+            x=Q_range, y=total_costs,
+            mode='lines', name='Total Cost',
+            line=dict(width=4, color='purple')
+        ))
+        fig.add_vline(
+            x=eoq, line_width=2, line_dash="dot", line_color="red",
+            annotation_text=f"EOQ = {eoq:.0f}",
+            annotation_position="top right"
+        )
+        fig.update_layout(
+            title="EOQ Cost Curves",
+            xaxis_title="Order Quantity (Q)",
+            yaxis_title="Annual Cost (NPR.)",
+            hovermode="x unified",
+            template="plotly_white",
+            height=500
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Dynamic explanation (optional)
+        st.markdown("---")
+        st.subheader("📖 What does this chart mean?")
+        explanation_text = eoq_explanation(
+            eoq, annual_demand, ordering_cost, holding_cost,
+            unit_cost, holding_cost_rate
+        )
+        st.info(explanation_text)
     else:
         st.info("Adjust holding cost or other parameters to see the EOQ curve.")
-
         # After plotting the chart, add the dynamic explanation
     st.markdown("---")
     st.subheader("📖 What does this chart mean?")
