@@ -220,16 +220,10 @@ with tab3:
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # Dynamic explanation (optional)
-        st.markdown("---")
-        st.subheader("📖 What does this chart mean?")
-        explanation_text = eoq_explanation(
-            eoq, annual_demand, ordering_cost, holding_cost,
-            unit_cost, holding_cost_rate
-        )
-        st.info(explanation_text)
+        
     else:
         st.info("Adjust holding cost or other parameters to see the EOQ curve.")
+        
         # After plotting the chart, add the dynamic explanation
     st.markdown("---")
     st.subheader("📖 What does this chart mean?")
