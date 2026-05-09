@@ -15,7 +15,7 @@ from reportlab.lib.units import inch
 # ------------------------------------------------------------
 # 1. PAGE CONFIGURATION (must be first)
 # ------------------------------------------------------------
-st.set_page_config(page_title="BizInsight AI", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="BizInsight Dashboard", layout="wide", initial_sidebar_state="expanded")
 
 # ------------------------------------------------------------
 # 2. SESSION STATE
@@ -38,21 +38,51 @@ def compute_eoq(D, S, H):
         return float('inf')
     return np.sqrt((2 * D * S) / H)
 
+#----------------------------------------------------------------
+# 4. EOQ CHART Explanation Function (for later use in the EOQ tab)
+def eoq_explanation(eoq, annual_demand, ordering_cost, holding_cost, unit_cost, holding_cost_rate):
+    """Returns a dynamic, plain‑English paragraph explaining the EOQ chart."""
+    if eoq == float('inf') or eoq <= 0:
+        return "⚠️ Unable to calculate EOQ because holding cost is zero. Please increase the holding cost rate or unit cost."
+    
+    # Round for readability
+    eoq_rounded = round(eoq)
+    orders_per_year = annual_demand / eoq
+    cycle_days = 365 / orders_per_year if orders_per_year > 0 else 0
+    
+    explanation = f"""
+    This chart helps you decide how many units to order each time to keep your total inventory costs as low as possible.
+    
+    **Two main costs fight against each other:**
+    - **Ordering cost** (blue dashed line) – goes down when you order more at once because you place fewer orders per year. Currently, you place about **{orders_per_year:.1f} orders per year**, so each order costs you **NPR. {ordering_cost:,.2f}**.
+    - **Holding cost** (orange dashed line) – goes up when you order more because you have to store more items longer. Storing one unit for a year costs you NPR. {holding_cost:,.2f} (that's {holding_cost_rate:.0%} of the unit cost NPR. {unit_cost:,.2f}).
+    
+    The **purple solid line** shows the sum of both costs – your total cost.  
+    The **lowest point of the purple line** is the sweet spot. That's your **Economic Order Quantity (EOQ)** – **{eoq_rounded} units** per order.
+    
+    **What happens if you change quantity?**
+    - Order **less than {eoq_rounded} units** → you'll pay more in ordering costs (too many orders).
+    - Order **more than {eoq_rounded} units** → you'll pay more in holding costs (too much stock sitting around).
+    
+    **Bottom line:** The red dotted line marks the best order quantity for your business. Order **{eoq_rounded} units** each time, and you'll re‑order about every **{cycle_days:.0f} days**, minimising your total inventory cost.
+    """
+    return explanation
+
 # ------------------------------------------------------------
-# 4. SIDEBAR – ALL INPUTS (Control Panel)
+# 5. SIDEBAR – ALL INPUTS (Control Panel)
 # ------------------------------------------------------------
 st.sidebar.title("⚙️ Control Panel")
 
 # Basic financial inputs
 units_sold = st.sidebar.number_input("Units Sold", min_value=0, value=1000, step=100)
-unit_price = st.sidebar.number_input("Unit Price ($)", min_value=0.0, value=50.0, step=1.0)
-unit_cost = st.sidebar.number_input("Unit Cost ($)", min_value=0.0, value=30.0, step=1.0)
+unit_price = st.sidebar.number_input("Unit Price (NPR.)", min_value=0.0, value=50.0, step=1.0)
+unit_cost = st.sidebar.number_input("Unit Cost (NPR.)", min_value=0.0, value=30.0, step=1.0)
 
 st.sidebar.markdown("---")
 
 # EOQ specific inputs
 annual_demand = st.sidebar.number_input("Annual Demand (D)", min_value=1, value=5000, step=500)
-ordering_cost = st.sidebar.number_input("Ordering Cost per Order (S) ($)", min_value=0.0, value=100.0, step=10.0)
+ordering_cost = st.sidebar.number_input("Ordering Cost per Order (S) (NPR.)", min_value=0.0, value=100.0, step=10.0)
 holding_cost_rate = st.sidebar.number_input("Holding Cost Rate (% of unit cost)", min_value=0.0, value=0.20, step=0.01)
 holding_cost = unit_cost * holding_cost_rate
 
@@ -65,22 +95,22 @@ st.sidebar.markdown("---")
 theme = st.sidebar.toggle("🌙 Dark Mode (UI)")
 
 # ------------------------------------------------------------
-# 5. TOP HEADER & KPI STRIP
+# 6. TOP HEADER & KPI STRIP
 # ------------------------------------------------------------
-st.title("📊 BizInsight AI")
+st.title("📊 BizInsight Dashboard")
 st.caption("Business Analytics • Profit Optimization • Inventory Intelligence")
 st.markdown("---")
 
 revenue, total_cost, profit, margin = compute_financials(units_sold, unit_price, unit_cost)
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Revenue", f"${revenue:,.0f}")
-col2.metric("Total Cost", f"${total_cost:,.0f}")
-col3.metric("Profit", f"${profit:,.0f}", delta=f"${profit:,.0f}")
+col1.metric("Revenue", f"NPR. {revenue:,.0f}")
+col2.metric("Total Cost", f"NPR. {total_cost:,.0f}")
+col3.metric("Profit", f"NPR. {profit:,.0f}", delta=f"NPR. {profit:,.0f}")
 col4.metric("Profit Margin", f"{margin:.1%}")
 
 # ------------------------------------------------------------
-# 6. MAIN DASHBOARD – TABS (Clean modular structure)
+# 7. MAIN DASHBOARD – TABS (Clean modular structure)
 # ------------------------------------------------------------
 tab1, tab2, tab3, tab4 = st.tabs([
     "📈 Overview",
@@ -114,9 +144,9 @@ with tab2:
     
     # Detailed KPI cards (already shown at top, but repeat for context)
     pc1, pc2, pc3, pc4 = st.columns(4)
-    pc1.metric("Revenue", f"${revenue:,.0f}")
-    pc2.metric("Total Cost", f"${total_cost:,.0f}")
-    pc3.metric("Profit", f"${profit:,.0f}")
+    pc1.metric("Revenue", f"NPR. {revenue:,.0f}")
+    pc2.metric("Total Cost", f"NPR. {total_cost:,.0f}")
+    pc3.metric("Profit", f"NPR. {profit:,.0f}")
     pc4.metric("Margin", f"{margin:.1%}")
     
     st.markdown("---")
@@ -126,11 +156,11 @@ with tab2:
     with opt_col1:
         required_price = unit_cost / (1 - target_margin) if target_margin < 1 else float('inf')
         st.metric(f"Price needed for {target_margin:.0%} margin",
-                  f"${required_price:,.2f}" if required_price != float('inf') else "Not possible")
+                  f"NPR. {required_price:,.2f}" if required_price != float('inf') else "Not possible")
     with opt_col2:
         max_cost = unit_price * (1 - target_margin)
         st.metric(f"Max unit cost for {target_margin:.0%} margin",
-                  f"${max_cost:,.2f}" if max_cost >= 0 else "Negative")
+                  f"NPR. {max_cost:,.2f}" if max_cost >= 0 else "Negative")
     
     st.caption("Use the sidebar slider to adjust target margin and see required price/cost changes.")
 
@@ -160,7 +190,7 @@ with tab3:
         ax.plot(Q_range, total_costs, label="Total Cost", linewidth=2)
         ax.axvline(eoq, color='red', linestyle=':', label=f"EOQ = {eoq:.0f}")
         ax.set_xlabel("Order Quantity (Q)")
-        ax.set_ylabel("Annual Cost ($)")
+        ax.set_ylabel("Annual Cost (NPR.)")
         ax.set_title("EOQ Cost Curves")
         ax.legend()
         ax.grid(True, alpha=0.3)
@@ -168,6 +198,16 @@ with tab3:
         plt.close(fig)
     else:
         st.info("Adjust holding cost or other parameters to see the EOQ curve.")
+
+        # After plotting the chart, add the dynamic explanation
+    st.markdown("---")
+    st.subheader("📖 What does this chart mean?")
+    explanation_text = eoq_explanation(
+        eoq, annual_demand, ordering_cost, holding_cost,
+        unit_cost, holding_cost_rate
+    )
+    st.info(explanation_text)
+
 
 # ===================== TAB 4: SCENARIO LAB =====================
 with tab4:
@@ -200,13 +240,13 @@ with tab4:
     if st.session_state.scenario_results:
         df_scenarios = pd.DataFrame(st.session_state.scenario_results)
         st.dataframe(df_scenarios.style.format({
-            "Revenue": "${:,.0f}", "Total Cost": "${:,.0f}", "Profit": "${:,.0f}", "Margin": "{:.1%}"
+            "Revenue": "NPR. {:,.0f}", "Total Cost": "NPR. {:,.0f}", "Profit": "NPR. {:,.0f}", "Margin": "{:.1%}"
         }), use_container_width=True)
     else:
         st.info("No scenarios added yet. Use the form above to compare business strategies.")
 
 # ------------------------------------------------------------
-# 7. INSIGHTS FOOTER (Decision Support Panel)
+# 8. INSIGHTS FOOTER (Decision Support Panel)
 # ------------------------------------------------------------
 st.markdown("---")
 st.subheader("🧠 AI Insights")
@@ -221,7 +261,7 @@ with insight_col2:
     st.write("• Adjust target margin to see required price changes instantly")
 
 # ------------------------------------------------------------
-# 8. PDF REPORT GENERATION (placed below insights)
+# 9. PDF REPORT GENERATION (placed below insights)
 # ------------------------------------------------------------
 st.subheader("📄 Generate Business Report")
 
@@ -242,9 +282,9 @@ def create_pdf_report():
     story.append(Paragraph("Profit Intelligence", heading_style))
     profit_data = [
         ["Metric", "Value"],
-        ["Revenue", f"${revenue:,.0f}"],
-        ["Total Cost", f"${total_cost:,.0f}"],
-        ["Profit", f"${profit:,.0f}"],
+        ["Revenue", f"NPR. {revenue:,.0f}"],
+        ["Total Cost", f"NPR. {total_cost:,.0f}"],
+        ["Profit", f"NPR. {profit:,.0f}"],
         ["Profit Margin", f"{margin:.1%}"]
     ]
     profit_table = Table(profit_data, colWidths=[2.5*inch, 2.5*inch])
@@ -262,8 +302,8 @@ def create_pdf_report():
     eoq_data = [
         ["Parameter", "Value"],
         ["Annual Demand (D)", f"{annual_demand}"],
-        ["Ordering Cost (S)", f"${ordering_cost:,.2f}"],
-        ["Holding Cost (H)", f"${holding_cost:,.2f}"],
+        ["Ordering Cost (S)", f"NPR. {ordering_cost:,.2f}"],
+        ["Holding Cost (H)", f"NPR. {holding_cost:,.2f}"],
         ["EOQ", f"{eoq:.0f} units" if eoq != float('inf') else "N/A"],
         ["Orders per Year", f"{annual_demand/eoq:.1f}" if eoq != float('inf') else "N/A"]
     ]
@@ -282,7 +322,7 @@ def create_pdf_report():
         story.append(Paragraph("Compared Scenarios", heading_style))
         scenario_table_data = [["Scenario", "Profit", "Margin"]]
         for s in st.session_state.scenario_results:
-            scenario_table_data.append([s["Scenario"], f"${s['Profit']:,.0f}", f"{s['Margin']:.1%}"])
+            scenario_table_data.append([s["Scenario"], f"NPR. {s['Profit']:,.0f}", f"{s['Margin']:.1%}"])
         sc_table = Table(scenario_table_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch])
         sc_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.grey),
@@ -308,7 +348,7 @@ if st.button("📥 Download PDF Report"):
     )
 
 # ------------------------------------------------------------
-# 9. DARK MODE STYLE (OPTIONAL)
+# 10. DARK MODE STYLE (OPTIONAL)
 # ------------------------------------------------------------
 if theme:
     st.markdown("""
@@ -325,7 +365,7 @@ if theme:
     """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# 10. FOOTER
+# 11. FOOTER
 # ------------------------------------------------------------
 st.divider()
 st.caption("BizInsight AI — Built with Streamlit, NumPy, Matplotlib, ReportLab | SaaS-style Dashboard")
